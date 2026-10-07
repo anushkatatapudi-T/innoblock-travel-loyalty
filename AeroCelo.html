@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AeroCelo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<style>
+:root{--bg:#07090f;--card:#0f1420;--line:#1f2a3d;--gold:#d4af6a;--txt:#e9edf5;--mut:#8b96ab;--ok:#4ade80;--err:#f87171}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at top,#15203a,var(--bg) 60%);color:var(--txt);font:14px/1.5 system-ui,-apple-system,sans-serif;min-height:100vh;padding:0 16px 40px}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-family:Georgia,serif;letter-spacing:.14em;color:var(--gold);margin:28px 0 4px;font-weight:400;font-size:30px}
+.sub{color:var(--mut);margin-bottom:20px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.grid .card{margin-bottom:0}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--gold);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.bal{font-size:24px;font-variant-numeric:tabular-nums}
+.lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+input,select{width:100%;background:#0a0f19;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:10px;margin:6px 0 10px;font-size:14px}
+button{background:var(--gold);color:#1a1405;border:0;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer;width:100%;font-size:14px}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold);width:auto}
+.msg{font-size:13px;margin-top:10px;word-break:break-word;min-height:1em}
+.ok{color:var(--ok)} .err{color:var(--err)} .mut{color:var(--mut)}
+.banner{background:#3b1d1d;border:1px solid #7f2d2d;color:#fecaca;padding:10px 14px;border-radius:10px;margin-bottom:16px;display:none}
+code{font-size:12px;color:var(--mut);word-break:break-all}
+a{color:var(--gold)}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.out{font-size:13px;color:var(--mut);margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+</style></head>
+<body><div class="wrap">
+<h1>AeroCelo</h1>
+<div class="sub">Travel-loyalty tokens on Ethereum Sepolia</div>
+<div id="netBanner" class="banner">Please switch to Ethereum Sepolia.</div>
+
+<div class="card">
+  <div class="row">
+    <div><div class="lbl">Wallet</div><code id="addr">Not connected</code></div>
+    <button id="connect" class="ghost">Connect MetaMask</button>
+  </div>
+  <div id="walletMsg" class="msg"></div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="lbl">HLT Balance</div><div class="bal" id="bHLT">—</div></div>
+  <div class="card"><div class="lbl">ALT Balance</div><div class="bal" id="bALT">—</div></div>
+  <div class="card"><div class="lbl">Sepolia ETH</div><div class="bal" id="bETH">—</div></div>
+  <div class="card"><div class="lbl">Chain ID</div><div class="bal" id="chain">—</div></div>
+</div>
+
+<div class="card">
+  <h2>Booking</h2>
+  <label class="lbl">Hotel</label>
+  <select id="hotel"><option value="0">Aurelia Grand, Lisbon</option><option value="1">Skyline Suites, Dubai</option><option value="2">Harbor Maison, Singapore</option></select>
+  <label class="lbl">Nights</label>
+  <input id="nights" type="number" min="1" value="2">
+  <div class="out" id="reward">Sample reward: 10 HLT</div>
+  <label class="lbl">Traveler wallet (receives reward)</label>
+  <input id="trav" placeholder="0x...">
+  <button id="bookBtn" class="act">Confirm Booking</button>
+  <div id="bookMsg" class="msg"></div>
+</div>
+
+<div class="card">
+  <h2>Token Swap · 1 HLT = <span id="rateTxt">—</span></h2>
+  <div class="lbl">HLT → ALT</div>
+  <input id="hIn" placeholder="HLT amount">
+  <div class="out">You receive: <span id="hOut">—</span></div>
+  <button id="hBtn" class="act">Swap HLT → ALT</button>
+  <div id="hMsg" class="msg"></div>
+  <div class="lbl" style="margin-top:16px">ALT → HLT</div>
+  <input id="aIn" placeholder="ALT amount">
+  <div class="out">You receive: <span id="aOut">—</span> <span id="aHint" class="err"></span></div>
+  <button id="aBtn" class="act">Swap ALT → HLT</button>
+  <div id="aMsg" class="msg"></div>
+</div>
+
+<div class="card">
+  <h2>Transfer HLT</h2>
+  <input id="tTo" placeholder="Recipient 0x...">
+  <input id="tAmt" placeholder="HLT amount">
+  <button id="tBtn" class="act">Send HLT</button>
+  <div id="tMsg" class="msg"></div>
+</div>
+
+<div class="card">
+  <h2>Redeem · 10 HLT</h2>
+  <select id="rSel"><option>Lounge access</option><option>Airport transfer</option></select>
+  <button id="redBtn" class="act">Redeem for 10 HLT</button>
+  <div id="redMsg" class="msg"></div>
+</div>
+
+<div class="card">
+  <h2>Contract Registry · Sepolia</h2>
+  <table>
+    <tr><td>HotelToken (HLT)</td><td><a target="_blank" rel="noopener" href="https://sepolia.etherscan.io/address/0x6908CCA97717566Ee5FaA96358Fb5A49ef64B81a"><code>0x6908CCA97717566Ee5FaA96358Fb5A49ef64B81a</code></a></td></tr>
+    <tr><td>AirlineToken (ALT)</td><td><a target="_blank" rel="noopener" href="https://sepolia.etherscan.io/address/0xdaF09Ecf06Ba9409F3647eFd14B9Aa25bBb6b55f"><code>0xdaF09Ecf06Ba9409F3647eFd14B9Aa25bBb6b55f</code></a></td></tr>
+    <tr><td>SwapContract</td><td><a target="_blank" rel="noopener" href="https://sepolia.etherscan.io/address/0xFd95C2d9b7A2f61Cc1e0031cb364ccCbbB38BEF3"><code>0xFd95C2d9b7A2f61Cc1e0031cb364ccCbbB38BEF3</code></a></td></tr>
+    <tr><td>RedemptionContract</td><td><a target="_blank" rel="noopener" href="https://sepolia.etherscan.io/address/0x0B3702320421d49F7546594C50a62C210E8C979C"><code>0x0B3702320421d49F7546594C50a62C210E8C979C</code></a></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Diagnostics</h2>
+  <div id="diag" class="mut" style="font-size:12px;white-space:pre-wrap">Starting…</div>
+</div>
+</div>
+
+<script>
+const SEPOLIA = 11155111;
+const C = {
+  HLT: "0x6908CCA97717566Ee5FaA96358Fb5A49ef64B81a",
+  ALT: "0xdaF09Ecf06Ba9409F3647eFd14B9Aa25bBb6b55f",
+  SWAP: "0xFd95C2d9b7A2f61Cc1e0031cb364ccCbbB38BEF3",
+  RED: "0x0B3702320421d49F7546594C50a62C210E8C979C"
+};
+const ERC20 = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address,address) view returns (uint256)",
+  "function approve(address,uint256) returns (bool)",
+  "function transfer(address,uint256) returns (bool)",
+  "function owner() view returns (address)",
+  "function mint(address,uint256)"
+];
+const SWAP_ABI = ["function RATE() view returns (uint256)","function swapHotelToAirline(uint256)","function swapAirlineToHotel(uint256)"];
+const RED_ABI = ["function redeem(string)"];
+const HOTELS = [
+  {name: "Aurelia Grand, Lisbon", reward: 5},
+  {name: "Skyline Suites, Dubai", reward: 6},
+  {name: "Harbor Maison, Singapore", reward: 5}
+];
+const rewardHLT = () => (Math.max(1, parseInt($("nights").value, 10) || 0)) * HOTELS[+$("hotel").value].reward;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtN = v => Number(ethers.utils.formatUnits(v, 18)).toLocaleString(undefined, {maximumFractionDigits: 4});
+const link = h => `<a target="_blank" rel="noopener" href="https://sepolia.etherscan.io/tx/${h}">View on Etherscan</a> · <code>${h}</code>`;
+const show = (el, html, cls = "mut") => { el.className = "msg " + cls; el.innerHTML = html; };
+const diagLines = {};
+const diag = (k, v) => { diagLines[k] = String(v); $("diag").textContent = Object.entries(diagLines).map(([a, b]) => a + ": " + b).join("\n"); };
+window.addEventListener("error", e => diag("Uncaught error", e.message));
+window.addEventListener("unhandledrejection", e => diag("Unhandled promise", (e.reason && e.reason.message) || e.reason));
+
+let provider = null, account = null, chainOk = false, busy = false, rc = null;
+
+function parse(s) {
+  const t = String(s || "").trim();
+  if (!/^\d*\.?\d+$/.test(t)) throw new Error("Enter a valid positive amount.");
+  const v = ethers.utils.parseUnits(t, 18);
+  if (v.isZero()) throw new Error("Amount must be greater than 0.");
+  return v;
+}
+
+function errText(e) {
+  if (e.code === -32002 || /already pending/i.test(e.message || ""))
+    return "MetaMask already has a request waiting. Open the MetaMask extension, approve or reject it, then click again.";
+  if (e.code === 4001 || e.code === "ACTION_REJECTED") return "Request rejected in wallet.";
+  if (e.code === "INSUFFICIENT_FUNDS") return "Insufficient Sepolia ETH for gas.";
+  if (e.code === "REPLACEMENT_UNDERPRICED" || e.code === "NONCE_EXPIRED" || /replacement|duplicate|nonce/i.test(e.message || ""))
+    return "Replacement or duplicate transaction detected. Check Etherscan before retrying.";
+  if (e.code === "CALL_EXCEPTION") return "Transaction reverted on-chain. Check balance, allowance and owner status.";
+  return e.reason || e.message || String(e);
+}
+
+// Rate: RATE() may be a plain multiplier (2) or 18-decimal scaled (2e18). Output = in * num / den.
+async function readRate() {
+  const r = await new ethers.Contract(C.SWAP, SWAP_ABI, provider).RATE();
+  const scaled = r.gte(ethers.constants.WeiPerEther);
+  return { num: r, den: scaled ? ethers.constants.WeiPerEther : ethers.BigNumber.from(1) };
+}
+
+async function refresh() {
+  diag("ethers.js", typeof ethers === "undefined" ? "MISSING (CDN blocked?)" : "loaded");
+  diag("window.ethereum", window.ethereum ? "present" : "MISSING (open in a browser with MetaMask)");
+  if (typeof ethers === "undefined") { show($("walletMsg"), "Could not load ethers.js. Check your internet connection and reload.", "err"); return; }
+  if (!window.ethereum) { show($("walletMsg"), "MetaMask is not installed. Install it from metamask.io to continue.", "err"); return; }
+  provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+  const cid = await window.ethereum.request({ method: "eth_chainId" });
+  chainOk = Number(cid) === SEPOLIA;
+  const accs = await window.ethereum.request({ method: "eth_accounts" });
+  account = accs[0] || null;
+  if (account) show($("walletMsg"), "", "mut");
+  diag("chainId raw", cid + " -> " + Number(cid) + (chainOk ? " (Sepolia OK)" : " (NOT Sepolia)"));
+  diag("account", account || "none");
+  $("addr").textContent = account || "Not connected";
+  $("chain").textContent = Number(cid);
+  $("netBanner").style.display = chainOk ? "none" : "block";
+  if (!account || !chainOk) {
+    ["bHLT", "bALT", "bETH"].forEach(i => $(i).textContent = "—");
+    rc = null; return;
+  }
+  const hlt = new ethers.Contract(C.HLT, ERC20, provider), alt = new ethers.Contract(C.ALT, ERC20, provider);
+  const [hb, ab, eb, rate] = await Promise.all([hlt.balanceOf(account), alt.balanceOf(account), provider.getBalance(account), readRate()]);
+  $("bHLT").textContent = fmtN(hb); $("bALT").textContent = fmtN(ab); $("bETH").textContent = fmtN(eb);
+  rc = rate;
+  diag("RATE() raw", rate.num.toString() + " (divisor " + rate.den.toString() + ")");
+  diag("balances", "HLT " + fmtN(hb) + " | ALT " + fmtN(ab) + " | ETH " + fmtN(eb));
+  $("rateTxt").textContent = fmtN(rc.num.mul(ethers.constants.WeiPerEther).div(rc.den)) + " ALT";
+  previews();
+}
+
+function previews() {
+  $("reward").textContent = `Sample reward: ${rewardHLT()} HLT`;
+  if (!rc) return;
+  try { const a = parse($("hIn").value); $("hOut").textContent = fmtN(a.mul(rc.num).div(rc.den)) + " ALT"; }
+  catch { $("hOut").textContent = "—"; }
+  try {
+    const a = parse($("aIn").value);
+    if (!a.mul(rc.den).mod(rc.num).isZero()) { $("aHint").textContent = "Must be divisible by the swap rate."; throw 0; }
+    $("aHint").textContent = "";
+    $("aOut").textContent = fmtN(a.mul(rc.den).div(rc.num)) + " HLT";
+  } catch { $("aOut").textContent = "—"; }
+}
+
+function setBusy(v) {
+  busy = v;
+  document.querySelectorAll("button.act").forEach(b => b.disabled = v);
+}
+
+async function ensureAllowance(tok, spender, amt, say) {
+  const owner = await tok.signer.getAddress();
+  if ((await tok.allowance(owner, spender)).gte(amt)) return;
+  say("Approving token spend in wallet…");
+  const tx = await tok.approve(spender, amt);
+  say("Approval submitted, waiting for confirmation…");
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Approval reverted.");
+}
+
+// Runs one on-chain action: checks state, executes, waits for receipt, refreshes, then reports.
+async function run(el, fn) {
+  if (busy) return;
+  setBusy(true);
+  show(el, "Waiting for wallet confirmation…");
+  try {
+    if (!window.ethereum) throw new Error("MetaMask is not installed.");
+    if (!account) throw new Error("Connect your wallet first.");
+    if (!chainOk) throw new Error("Please switch to Ethereum Sepolia.");
+    const signer = new ethers.providers.Web3Provider(window.ethereum, "any").getSigner();
+    const say = t => show(el, esc(t));
+    const hash = await fn(signer, say);
+    await refresh().catch(() => {});
+    show(el, `<span class="ok">Confirmed.</span> ${link(hash)}`);
+  } catch (e) {
+    show(el, esc(errText(e)), "err");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function connect() {
+  if (!window.ethereum) return show($("walletMsg"), "MetaMask is not installed. Install it from metamask.io.", "err");
+  try { await window.ethereum.request({ method: "eth_requestAccounts" }); await refresh(); }
+  catch (e) { show($("walletMsg"), esc(errText(e)), "err"); }
+}
+
+$("connect").onclick = connect;
+$("nights").oninput = previews;
+$("hotel").onchange = previews;
+$("hIn").oninput = previews;
+$("aIn").oninput = previews;
+
+$("hBtn").onclick = () => run($("hMsg"), async (signer, say) => {
+  const amt = parse($("hIn").value);
+  const hlt = new ethers.Contract(C.HLT, ERC20, signer), sw = new ethers.Contract(C.SWAP, SWAP_ABI, signer);
+  const cfg = await readRate();
+  if ((await hlt.balanceOf(account)).lt(amt)) throw new Error("Insufficient HLT balance.");
+  if (amt.mul(cfg.num).div(cfg.den).isZero()) throw new Error("Amount too small to produce ALT.");
+  await ensureAllowance(hlt, C.SWAP, amt, say);
+  say("Submitting swap…");
+  const tx = await sw.swapHotelToAirline(amt);
+  say(`Swap submitted (${tx.hash.slice(0, 12)}…), waiting for confirmation…`);
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Swap reverted on-chain.");
+  return tx.hash;
+});
+
+$("aBtn").onclick = () => run($("aMsg"), async (signer, say) => {
+  const amt = parse($("aIn").value);
+  const cfg = await readRate();
+  if (!amt.mul(cfg.den).mod(cfg.num).isZero()) throw new Error("ALT amount must be divisible by the swap rate.");
+  const alt = new ethers.Contract(C.ALT, ERC20, signer), sw = new ethers.Contract(C.SWAP, SWAP_ABI, signer);
+  if ((await alt.balanceOf(account)).lt(amt)) throw new Error("Insufficient ALT balance.");
+  await ensureAllowance(alt, C.SWAP, amt, say);
+  say("Submitting swap…");
+  const tx = await sw.swapAirlineToHotel(amt);
+  say(`Swap submitted (${tx.hash.slice(0, 12)}…), waiting for confirmation…`);
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Swap reverted on-chain.");
+  return tx.hash;
+});
+
+$("tBtn").onclick = () => run($("tMsg"), async (signer, say) => {
+  const to = $("tTo").value.trim();
+  if (!ethers.utils.isAddress(to)) throw new Error("Enter a valid recipient address.");
+  const amt = parse($("tAmt").value);
+  const hlt = new ethers.Contract(C.HLT, ERC20, signer);
+  if ((await hlt.balanceOf(account)).lt(amt)) throw new Error("Insufficient HLT balance.");
+  say("Waiting for transfer confirmation…");
+  const tx = await hlt.transfer(to, amt);
+  say(`Transfer submitted (${tx.hash.slice(0, 12)}…), waiting for confirmation…`);
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Transfer reverted on-chain.");
+  return tx.hash;
+});
+
+$("redBtn").onclick = () => run($("redMsg"), async (signer, say) => {
+  const hlt = new ethers.Contract(C.HLT, ERC20, signer);
+  const cost = ethers.utils.parseUnits("10", 18);
+  if ((await hlt.balanceOf(account)).lt(cost)) throw new Error("Insufficient HLT balance (10 HLT required).");
+  await ensureAllowance(hlt, C.RED, cost, say);
+  const red = new ethers.Contract(C.RED, RED_ABI, signer);
+  say("Submitting redemption…");
+  const tx = await red.redeem($("rSel").value);
+  say(`Redemption submitted (${tx.hash.slice(0, 12)}…), waiting for confirmation…`);
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Redemption reverted on-chain.");
+  return tx.hash;
+});
+
+$("bookBtn").onclick = () => run($("bookMsg"), async (signer, say) => {
+  const hlt = new ethers.Contract(C.HLT, ERC20, signer);
+  const owner = await hlt.owner();
+  if (owner.toLowerCase() !== account.toLowerCase()) throw new Error("Partner authorization required.");
+  const to = $("trav").value.trim();
+  if (!ethers.utils.isAddress(to)) throw new Error("Enter a valid traveler wallet address.");
+  const nights = parseInt($("nights").value, 10);
+  if (!(nights > 0)) throw new Error("Enter at least 1 night.");
+  const amt = ethers.utils.parseUnits(String(nights * HOTELS[+$("hotel").value].reward), 18);
+  say("Minting booking reward…");
+  const tx = await hlt.mint(to, amt);
+  say(`Mint submitted (${tx.hash.slice(0, 12)}…), waiting for confirmation…`);
+  const r = await tx.wait();
+  if (r.status !== 1) throw new Error("Mint reverted on-chain.");
+  return tx.hash;
+});
+
+if (window.ethereum) {
+  window.ethereum.on("accountsChanged", () => refresh().catch(e => console.error(e)));
+  window.ethereum.on("chainChanged", () => refresh().catch(e => console.error(e)));
+}
+refresh().catch(e => show($("walletMsg"), esc(errText(e)), "err"));
+</script>
+</body></html>
